@@ -8,12 +8,7 @@ const sequelize = new Sequelize(
   {
     host: process.env.DB_HOST,
     dialect: 'mysql',
-    dialectOptions: {
-      // If using SSL (recommended for Cloud SQL)
-      ssl: {
-        rejectUnauthorized: false,
-      },
-    },
+    logging: false,
   }
 );
 
