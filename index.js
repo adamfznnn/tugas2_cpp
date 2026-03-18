@@ -1,45 +1,83 @@
-// Import Package dan File
-const express = require("express");
-const sequelize = require("./config/database");
-const noteRoutes = require("./routes/noteRoutes");
+const API_URL = "http://136.116.226.198:3000/api/v1/notes";
 
-// Inisialisasi Express dan Cors
-const app = express();
-const cors = require("cors");
-
-// Izinkan origin frontend lokal dan IP Publik VM untuk Bonus Deployment
-app.use(cors({
-  origin: ['http://localhost', 'http://127.0.0.1:5500', 'http://localhost:5173'], // Sesuaikan dengan Live Server kamu
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-}));
-
-// Middleware untuk parsing JSON
-app.use(express.json());
-
-// Route dasar untuk testing
-app.get("/", (req, res) => {
-  res.send("Backend Aplikasi Notes Jalan!");
+document.addEventListener("DOMContentLoaded", () => {
+  getNotes();
 });
 
-// Setting Routes
-// 2. Load Model agar Tabel 'notes' dibuat otomatis oleh Sequelize
-require("./models/noteModels");
+const formulir = document.querySelector("#user-form");
 
-// 3. Gunakan Routes Note
-// Saya sarankan pakai prefix /api/v1/notes agar rapi
-app.use("/api/v1", noteRoutes);
+formulir.addEventListener("submit", async (e) => {
+  e.preventDefault();
 
-// Sync Database dan Jalankan Server
-const port = process.env.PORT || 3000;
+  const elemenName = document.querySelector("#name");
+  const elemenEmail = document.querySelector("#email");
 
-sequelize.sync({ force: false }).then(() => {
-  console.log("Database & Tabel Notes Berhasil Disinkronisasi");
+  const judul = elemenName.value.trim();
+  const isi = elemenEmail.value.trim();
+  const id = elemenName.dataset.id || "";
 
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running on port ${port}`);
+  if (!judul || !isi) return;
+
+  try {
+    if (id === "") {
+      await axios.post(API_URL, { judul, isi });
+    } else {
+      await axios.put(`${API_URL}/${id}`, { judul, isi });
+    }
+
+    // Reset form
+    elemenName.dataset.id = "";
+    elemenName.value = "";
+    elemenEmail.value = "";
+
+    getNotes(); // Refresh tabel otomatis
+  } catch (error) {
+    console.error("Error simpan:", error);
+    alert("Gagal simpan! Cek koneksi ke port 3000.");
+  }
+});
+
+async function getNotes() {
+  try {
+    const response = await axios.get(API_URL);
+    const notes = response.data?.data || [];
+    const table = document.querySelector("#table-user");
+
+    let tampilan = "";
+    notes.forEach((note, index) => {
+      tampilan += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td class="name">${note.judul}</td>
+                    <td class="email">${note.isi}</td>
+                    <td><button data-id="${note.id}" class="btn-edit">Edit</button></td>
+                    <td><button data-id="${note.id}" class="btn-hapus">Hapus</button></td>
+                </tr>`;
+    });
+    table.innerHTML = tampilan;
+    inisialisasiTombol();
+  } catch (error) {
+    console.error("Gagal ambil data:", error);
+  }
+}
+
+function inisialisasiTombol() {
+  // Tombol Hapus
+  document.querySelectorAll(".btn-hapus").forEach(btn => {
+    btn.onclick = async () => {
+      if (confirm("Hapus?")) {
+        await axios.delete(`${API_URL}/${btn.dataset.id}`);
+        getNotes();
+      }
+    };
   });
-
-}).catch((err) => {
-  console.error("Gagal sinkronisasi database:", err.message);
-});
+  // Tombol Edit
+  document.querySelectorAll(".btn-edit").forEach(btn => {
+    btn.onclick = () => {
+      const row = btn.closest("tr");
+      document.querySelector("#name").dataset.id = btn.dataset.id;
+      document.querySelector("#name").value = row.querySelector(".name").innerText;
+      document.querySelector("#email").value = row.querySelector(".email").innerText;
+    };
+  });
+}
