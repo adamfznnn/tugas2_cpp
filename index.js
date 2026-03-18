@@ -1,83 +1,35 @@
-const API_URL = "http://136.116.226.198:3000/api/v1/notes";
+const express = require("express");
+const cors = require("cors");
+const sequelize = require("./config/database");
+const noteRoutes = require("./routes/noteRoutes");
 
-document.addEventListener("DOMContentLoaded", () => {
-  getNotes();
-});
+const app = express();
 
-const formulir = document.querySelector("#user-form");
+// 1. Middleware CORS (PENTING: Agar Frontend bisa akses port 3000)
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
 
-formulir.addEventListener("submit", async (e) => {
-  e.preventDefault();
+// 2. Middleware JSON
+app.use(express.json());
 
-  const elemenName = document.querySelector("#name");
-  const elemenEmail = document.querySelector("#email");
+// 3. Load Model (Agar tabel otomatis terbuat di Cloud SQL)
+require("./models/noteModels");
 
-  const judul = elemenName.value.trim();
-  const isi = elemenEmail.value.trim();
-  const id = elemenName.dataset.id || "";
+// 4. Routes (Gunakan prefix /api/v1 sesuai URL di frontend kamu)
+app.use("/api/v1", noteRoutes);
 
-  if (!judul || !isi) return;
+const port = 3000;
 
-  try {
-    if (id === "") {
-      await axios.post(API_URL, { judul, isi });
-    } else {
-      await axios.put(`${API_URL}/${id}`, { judul, isi });
-    }
+// 5. Sync Database & Jalankan Server
+sequelize.sync({ force: false }).then(() => {
+  console.log("Database & Tabel Notes Berhasil Disinkronisasi");
 
-    // Reset form
-    elemenName.dataset.id = "";
-    elemenName.value = "";
-    elemenEmail.value = "";
-
-    getNotes(); // Refresh tabel otomatis
-  } catch (error) {
-    console.error("Error simpan:", error);
-    alert("Gagal simpan! Cek koneksi ke port 3000.");
-  }
-});
-
-async function getNotes() {
-  try {
-    const response = await axios.get(API_URL);
-    const notes = response.data?.data || [];
-    const table = document.querySelector("#table-user");
-
-    let tampilan = "";
-    notes.forEach((note, index) => {
-      tampilan += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td class="name">${note.judul}</td>
-                    <td class="email">${note.isi}</td>
-                    <td><button data-id="${note.id}" class="btn-edit">Edit</button></td>
-                    <td><button data-id="${note.id}" class="btn-hapus">Hapus</button></td>
-                </tr>`;
-    });
-    table.innerHTML = tampilan;
-    inisialisasiTombol();
-  } catch (error) {
-    console.error("Gagal ambil data:", error);
-  }
-}
-
-function inisialisasiTombol() {
-  // Tombol Hapus
-  document.querySelectorAll(".btn-hapus").forEach(btn => {
-    btn.onclick = async () => {
-      if (confirm("Hapus?")) {
-        await axios.delete(`${API_URL}/${btn.dataset.id}`);
-        getNotes();
-      }
-    };
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Server Backend running on port ${port}`);
   });
-  // Tombol Edit
-  document.querySelectorAll(".btn-edit").forEach(btn => {
-    btn.onclick = () => {
-      const row = btn.closest("tr");
-      document.querySelector("#name").dataset.id = btn.dataset.id;
-      document.querySelector("#name").value = row.querySelector(".name").innerText;
-      document.querySelector("#email").value = row.querySelector(".email").innerText;
-    };
-  });
-}
+}).catch((err) => {
+  console.error("Gagal sinkronisasi database:", err.message);
+});
